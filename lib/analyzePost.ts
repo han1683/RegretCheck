@@ -1,6 +1,7 @@
 import type {
   AnalyzePostRequest,
   AnalyzePostResponse,
+  AnalyzeImageRequest,
   Recommendation,
   RiskLevel,
   RiskScores,
@@ -222,6 +223,62 @@ export function analyzePostMock(request: AnalyzePostRequest): AnalyzePostRespons
     scores,
     whyYouMightRegretIt: buildReasons(scores, request.postType),
     ...rewrites,
+    recommendation: getRecommendation(overallScore),
+  };
+}
+
+export function analyzeImageMock(request: AnalyzeImageRequest): AnalyzePostResponse {
+  const context = request.captionContext?.trim();
+  const baseAnalysis = analyzePostMock({
+    postText:
+      context ||
+      `Uploaded ${request.postType.toLowerCase()} screenshot for ${request.platform}. Check visible text, background details, and overall vibe.`,
+    platform: request.platform,
+    postType: request.postType,
+    desiredVibe: request.desiredVibe,
+  });
+
+  const scores: RiskScores = {
+    cringeRisk: clampScore(baseAnalysis.scores.cringeRisk + 4),
+    employerRisk: clampScore(baseAnalysis.scores.employerRisk + (request.platform === "LinkedIn" ? 10 : 4)),
+    privacyRisk: clampScore(baseAnalysis.scores.privacyRisk + 22),
+    brandRisk: clampScore(baseAnalysis.scores.brandRisk + (["Business", "Work/Career"].includes(request.postType) ? 12 : 6)),
+    dramaRisk: clampScore(baseAnalysis.scores.dramaRisk + 4),
+    misunderstandingRisk: clampScore(baseAnalysis.scores.misunderstandingRisk + 10),
+  };
+
+  const overallScore = clampScore(
+    scores.cringeRisk * 0.1 +
+      scores.employerRisk * 0.15 +
+      scores.privacyRisk * 0.25 +
+      scores.brandRisk * 0.15 +
+      scores.dramaRisk * 0.2 +
+      scores.misunderstandingRisk * 0.15,
+  );
+
+  const imageReasons = [
+    "Screenshots can reveal names, handles, faces, locations, notifications, or background details that text-only checks miss.",
+    "Crop anything personal before posting so the focus stays on the message, not accidental context.",
+  ];
+
+  return {
+    overallScore,
+    riskLevel: getRiskLevel(overallScore),
+    mainConcern: context
+      ? `${baseAnalysis.mainConcern} Also check the screenshot for visible personal details before posting.`
+      : "The biggest screenshot risk is accidental context: names, faces, locations, or background details may say more than the caption.",
+    scores,
+    whyYouMightRegretIt: [...imageReasons, ...baseAnalysis.whyYouMightRegretIt].slice(0, 4),
+    saferVersion: context
+      ? baseAnalysis.saferVersion
+      : "Crop personal details, keep the visual clean, and use a caption that says exactly what you mean.",
+    confidentVersion: context
+      ? baseAnalysis.confidentVersion
+      : "Clean screenshot, clear caption, calm delivery.",
+    professionalVersion: context
+      ? baseAnalysis.professionalVersion
+      : "Use a cropped, polished version that keeps private details out of frame.",
+    funnyVersion: context ? baseAnalysis.funnyVersion : "Posting the clean crop because future me deserves peace.",
     recommendation: getRecommendation(overallScore),
   };
 }

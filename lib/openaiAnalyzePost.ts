@@ -1,5 +1,5 @@
 import { analysisResponseSchema, normalizeAnalysisResponse } from "@/lib/analysisResponse";
-import type { AnalyzePostRequest, AnalyzePostResponse } from "@/types/analysis";
+import type { AnalyzeImageRequest, AnalyzePostRequest, AnalyzePostResponse } from "@/types/analysis";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_MODEL = "gpt-5.5";
@@ -12,6 +12,7 @@ Tone rules:
 - Be honest, direct, useful, and slightly playful.
 - Do not shame, insult, moralize, or diagnose the user.
 - Focus on perception risk: cringe, drama, privacy, employer, brand, and misunderstanding.
+- For images, inspect visible text, usernames, faces, backgrounds, notifications, locations, school/workplace details, and private info.
 - Give rewrites that preserve the user's intent while reducing regret risk.
 - Keep explanations concise and practical.
 
@@ -93,6 +94,79 @@ export async function analyzePostWithOpenAI(request: AnalyzePostRequest): Promis
 
   if (!response.ok) {
     throw new Error(data.error?.message || "OpenAI analysis request failed.");
+  }
+
+  const outputText = extractOutputText(data);
+
+  if (!outputText) {
+    throw new Error("OpenAI response did not include text output.");
+  }
+
+  return normalizeAnalysisResponse(JSON.parse(outputText));
+}
+
+export async function analyzeImageWithOpenAI(request: AnalyzeImageRequest): Promise<AnalyzePostResponse> {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is not configured.");
+  }
+
+  const response = await fetch(OPENAI_RESPONSES_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: process.env.OPENAI_MODEL || DEFAULT_MODEL,
+      input: [
+        {
+          role: "system",
+          content: systemPrompt,
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: JSON.stringify({
+                task: "Analyze this uploaded social media screenshot for regret risk.",
+                platform: request.platform,
+                postType: request.postType,
+                desiredVibe: request.desiredVibe,
+                captionContext: request.captionContext || "",
+                visualChecks: [
+                  "extract visible caption or on-screen text",
+                  "look for usernames, faces, locations, school or workplace details, license plates, notifications, and private info",
+                  "judge whether the image changes how the post could be perceived",
+                ],
+              }),
+            },
+            {
+              type: "input_image",
+              image_url: request.imageDataUrl,
+            },
+          ],
+        },
+      ],
+      store: false,
+      text: {
+        format: {
+          type: "json_schema",
+          name: "regretcheck_image_analysis",
+          description: "Structured RegretCheck screenshot analysis.",
+          schema: analysisResponseSchema,
+          strict: true,
+        },
+      },
+    }),
+  });
+
+  const data = (await response.json()) as OpenAIResponseBody;
+
+  if (!response.ok) {
+    throw new Error(data.error?.message || "OpenAI image analysis request failed.");
   }
 
   const outputText = extractOutputText(data);

@@ -9,6 +9,15 @@ export interface AnalyzePostRequest {
   desiredVibe: string;
 }
 
+export interface AnalyzeImageRequest {
+  imageDataUrl: string;
+  imageMimeType: string;
+  platform: string;
+  postType: string;
+  desiredVibe: string;
+  captionContext?: string;
+}
+
 export interface RiskScores {
   cringeRisk: number;
   employerRisk: number;

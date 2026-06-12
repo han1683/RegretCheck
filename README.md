@@ -1,6 +1,6 @@
 # RegretCheck
 
-RegretCheck is a Next.js MVP that helps people check whether a caption or post could come across as cringe, risky, unprofessional, too dramatic, or damaging before it goes live.
+RegretCheck is a Next.js MVP that helps people check whether a caption, screenshot, or post could come across as cringe, risky, unprofessional, too dramatic, or damaging before it goes live.
 
 ## Local Development
 
@@ -13,7 +13,7 @@ Open `http://localhost:3000` or the port shown in your terminal.
 
 ## AI Analysis
 
-The app works without an API key by using the mock analyzer in `lib/analyzePost.ts`.
+The app works without an API key by using the mock analyzers in `lib/analyzePost.ts`.
 
 To enable real AI analysis, create a local `.env` file:
 
@@ -22,4 +22,10 @@ OPENAI_API_KEY=your_api_key_here
 OPENAI_MODEL=gpt-5.5
 ```
 
-The `/api/analyze` route uses OpenAI when `OPENAI_API_KEY` is present and falls back to the mock analyzer if the API call fails.
+The `/api/analyze` and `/api/analyze-image` routes use OpenAI when `OPENAI_API_KEY` is present and fall back to the mock analyzers if the API call fails.
+
+## Media Uploads
+
+- Text posts use `/api/analyze`.
+- Screenshot uploads use `/api/analyze-image`.
+- Video is shown as the next beta surface, but upload processing is not built yet.
